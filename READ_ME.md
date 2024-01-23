@@ -8,4 +8,6 @@ Second step is installed dependencies will be installed after "pip -r requiremen
 
 Third step is open "src/main" and make changes app and main_router
 
-Fourth step is copy .env-example and make extras info if need and try to start project after that
+Fourth step is copy .env-example and make extras info if need
+
+Fifth step is "pre-commit install" in console
