@@ -1,6 +1,6 @@
 line-length = 79
 target-version = "py37"
-select = [
+lint.select = [
     "F", # pyflakes
     "E", # pycodestyle errors
     "W", # pycodestyle warnings
@@ -45,10 +45,10 @@ select = [
     "ANN002", # missing type annotation for *args
     "ANN003", # missing type annotation for **kwargs
 ]
-unfixable = [
+lint.unfixable = [
     "ERA001", # eradicate: found commented out code (can be dangerous if fixed automatically)
 ]
-ignore = [
+lint.ignore = [
     "ISC", # flake8-implicit-str-concat
     "COM", # flake8-commas
     "RUF003", #  Comment contains ambiguous
@@ -73,7 +73,7 @@ ignore = [
     "ARG005",
 ]
 
-[per-file-ignores]
+[lint.per-file-ignores]
 "*tests/*" = [
     "ANN001", # missing type annotation for arguments
     "ANN002", # missing type annotation for *args
