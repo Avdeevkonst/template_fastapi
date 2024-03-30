@@ -1,19 +1,19 @@
 """Added user and personal table
 
-Revision ID: 8eab123c8909
+Revision ID: 580ca2c834e0
 Revises:
-Create Date: 2024-03-30 13:07:11.846894
+Create Date: 2024-03-30 21:45:53.341142
 
 """
 
 from typing import Sequence, Union
 
+from alembic import op
 import sqlalchemy as sa
 
-from alembic import op
 
 # revision identifiers, used by Alembic.
-revision: str = "8eab123c8909"
+revision: str = "580ca2c834e0"
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -26,6 +26,11 @@ def upgrade() -> None:
         sa.Column("id", sa.Integer(), nullable=False),
         sa.Column("username", sa.String(length=20), nullable=False),
         sa.Column("password", sa.String(length=1024), nullable=False),
+        sa.Column(
+            "role",
+            sa.Enum("User", "Administrator", name="userrole"),
+            nullable=False,
+        ),
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.Column("is_active", sa.Boolean(), nullable=False),
         sa.Column("is_superuser", sa.Boolean(), nullable=False),
@@ -40,13 +45,13 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(), nullable=False),
         sa.Column("phone", sa.String(length=12), nullable=False),
         sa.Column("email", sa.String(), nullable=False),
-        sa.Column("user_id", sa.Integer(), nullable=False),
         sa.ForeignKeyConstraint(
-            ["user_id"],
+            ["id"],
             ["user.id"],
         ),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("user_id"),
+        sa.UniqueConstraint("email"),
+        sa.UniqueConstraint("phone"),
     )
     # ### end Alembic commands ###
 

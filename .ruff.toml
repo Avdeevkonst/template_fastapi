@@ -84,7 +84,7 @@ lint.ignore = [
     "B018", # ignore useless expressions in tests
     "PT012", # ignore complex with pytest.raises clauses
 ]
-"*migrations/*" = [
+"*alembic/*" = [
     "Q000",
     "I001",
     "W291",
