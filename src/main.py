@@ -1,9 +1,11 @@
 from fastapi import APIRouter, FastAPI
 
-# write title for your application
-app = FastAPI(title="")
+from src.router import router as router_user
 
-# write prefix for your application
-main_router = APIRouter(prefix="")
+app = FastAPI(title="oauth2")
+
+main_router = APIRouter(prefix="/oauth2/api/v1")
+main_router.include_router(router_user)
+
 
 app.include_router(main_router)
