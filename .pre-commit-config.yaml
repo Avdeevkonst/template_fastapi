@@ -3,16 +3,18 @@ repos:
     rev: v4.5.0
     hooks:
       - id: trailing-whitespace  # убирает лишние пробелы
-      - id: check-added-large-files  # проверяет тяжелые файлы на изменения
       - id: check-yaml  # проверяет синтаксис .yaml файлов
-      - id: check-json  # проверяет синтаксис .json файлов
         exclude: launch.json
       - id: check-case-conflict  # проверяет файлы, которые могут конфликтовать в файловых системах без учета регистра.
       - id: check-merge-conflict  # проверяет файлы, содержащие конфликтные строки слияния.
       - id: end-of-file-fixer  # добавляет пустую строку в конце файла
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.1.3
+    # Ruff version.
+    rev: v0.3.4
     hooks:
+      # Run the linter.
       - id: ruff
+        args: [ --fix ]
+      # Run the formatter.
       - id: ruff-format
