@@ -66,10 +66,10 @@ class Token:
                 status_code=status.HTTP_403_FORBIDDEN,
             )
 
-    def user_id(self) -> str:
+    def user_id(self) -> int:
         user_id = self._decode().get("id", None)
         if user_id:
-            return user_id
+            return int(user_id)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Token must have key id",
@@ -127,14 +127,16 @@ def create_token(
     return jwt.encode(data, settings.SECRET_KEY, algorithm=settings.ALGORITHMS)
 
 
-async def check_credentials(db: AsyncSession, credentials: Credentials):
+async def check_credentials(
+    db: AsyncSession, credentials: Credentials
+) -> UserSchema:
     user = await get_user_model(db, credentials.username)
-    if not verify_password(credentials.password, user["password"]):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Wrong password",
-        )
-    return UserSchema(**user)
+    if verify_password(credentials.password, user["password"]):
+        return UserSchema(**user)
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Wrong password",
+    )
 
 
 async def check_authenticate(
