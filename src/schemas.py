@@ -48,6 +48,10 @@ class UserView(BaseModel):
     email: str
 
 
+class Me(BaseModel):
+    pass
+
+
 class Credentials(BaseModel):
     username: str
     password: str
@@ -65,3 +69,7 @@ class UserSchema(BaseModel):
 
 class RefreshTokenSchema(BaseModel):
     token: str
+
+
+class ChangePassword(Credentials):
+    new_password: str
