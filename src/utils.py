@@ -1,7 +1,7 @@
 import re
 import secrets
 from enum import Enum
-from typing import Never
+from typing import NoReturn
 
 from fastapi import HTTPException, status
 from passlib.context import CryptContext
@@ -22,7 +22,7 @@ def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
 
-def handle_error(error: SQLAlchemyError) -> Never:
+def handle_error(error: SQLAlchemyError) -> NoReturn:
     msg = convert_sqlachemy_exception(error)
     raise HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,

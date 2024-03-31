@@ -1,6 +1,13 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    HTTPException,
+    Request,
+    status,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.auth import (
@@ -15,13 +22,17 @@ from src.crud import (
     create_user_model,
     get_personal_model,
     get_user_model,
+    update_profile_model,
     update_user_model,
 )
+from src.mail import send_mail_background
 from src.schemas import (
     ChangePassword,
     Credentials,
+    MailSchema,
     RefreshTokenSchema,
     Register,
+    UpdateProfile,
     UserView,
 )
 from src.storage import get_async_session
@@ -56,27 +67,37 @@ async def refresh_token(token: RefreshTokenSchema):
     return RefreshToken(token=token.token, role=UserRole.noone).create_token()
 
 
-@router.put("/change-password/{user_id}", status_code=status.HTTP_200_OK)
+@router.put("/change/password/{user_id}", status_code=status.HTTP_200_OK)
 async def change_password(
     request: Request,
     db: Annotated[AsyncSession, Depends(get_async_session)],
     credentials: ChangePassword,
+    background_tasks: BackgroundTasks,
 ):
     token = _get_token_from_request(request)
     user_data = Token(token, [UserRole.user, UserRole.administrator])
     user_data.check_permission(exclude=False)
     user_id = user_data.user_id()
+    user_email = user_data.user_email()
     user = await check_credentials(db, credentials)
     if user_id != user.id:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Provided credentials not correct",
         )
+    new_password_to_mail = credentials.new_password
     credentials.new_password = get_password_hash(credentials.new_password)
     changed_user_credentials = await update_user_model(
         db, credentials, user_id=user_id
     )
     if "password" in changed_user_credentials:
+        msg = f"Your password was changed {new_password_to_mail}"
+        mail = MailSchema(
+            recipients=[user_email],
+            body=msg,
+            subject="Ouath2: Changed password",
+        )
+        send_mail_background(background_tasks, mail)
         del changed_user_credentials["password"]
     return changed_user_credentials
 
@@ -102,4 +123,22 @@ async def profile_user(
         del schema["role"]
         del schema["is_active"]
         del schema["is_superuser"]
+    return schema
+
+
+@router.put("/change/profile", status_code=status.HTTP_200_OK)
+async def change_profile(
+    request: Request,
+    db: Annotated[AsyncSession, Depends(get_async_session)],
+    profile: UpdateProfile,
+):
+    token = _get_token_from_request(request)
+    user_data = Token(token, [UserRole.user, UserRole.administrator])
+    user_data.check_permission(exclude=False)
+    user_id = user_data.user_id()
+    profile_model = await update_profile_model(db, profile, user_id)
+    user_model = await get_user_model(db, user_id)
+    schema = {**profile_model, **user_model}
+    if "password" in schema:
+        del schema["password"]
     return schema

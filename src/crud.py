@@ -8,7 +8,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.exception import SchemaError
 from src.models import Personal, User
-from src.schemas import ChangePassword, Credentials, Register, UserSchema
+from src.schemas import (
+    ChangePassword,
+    Credentials,
+    Register,
+    UpdateProfile,
+    UserSchema,
+)
 from src.utils import (
     get_password_hash,
     handle_error,
@@ -74,7 +80,7 @@ async def update_user_model(
     if isinstance(payload, Credentials) and user_id:
         query = (
             update(User)
-            .values(username=payload.username, password=payload.new_password)
+            .values(password=payload.new_password)
             .where(User.id == user_id)
         ).returning(User)
     elif isinstance(payload, UserSchema):
@@ -114,3 +120,32 @@ async def get_personal_model(db: AsyncSession, user_id: int):
         await db.rollback()
         handle_error(e)
     return user.__dict__
+
+
+async def update_profile_model(
+    db: AsyncSession,
+    payload: UpdateProfile,
+    user_id: int,
+):
+    values = {}
+    if payload.email and payload.phone:
+        values = payload.model_dump()
+    elif payload.email is None:
+        values["phone"] = payload.phone
+    elif payload.phone is None:
+        values["email"] = payload.email
+    query = (
+        update(Personal).values(values).where(Personal.id == user_id)
+    ).returning(Personal)
+    try:
+        response = await db.execute(query)
+        profile = response.scalar_one()
+        await db.commit()
+    except (
+        NoResultFound,
+        SQLAlchemyError,
+        IntegrityError,
+    ) as e:
+        await db.rollback()
+        handle_error(e)
+    return profile.__dict__

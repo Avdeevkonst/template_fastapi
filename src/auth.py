@@ -7,8 +7,8 @@ from fastapi import HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import settings
-from src.crud import get_user_model
-from src.schemas import Credentials, UserSchema
+from src.crud import get_personal_model, get_user_model
+from src.schemas import CreateJwt, Credentials, UserSchema
 from src.utils import UserRole, verify_password
 
 access_token_expires = timedelta(minutes=30)
@@ -75,8 +75,23 @@ class Token:
             detail="Token must have key id",
         )
 
-    def user_role(self) -> Union[str, None]:
-        return self._decode().get("role", None)
+    def user_role(self) -> str:
+        role = self._decode().get("role", None)
+        if role:
+            return role
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Token must have key role",
+        )
+
+    def user_email(self) -> str:
+        email = self._decode().get("email", None)
+        if email:
+            return email
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Token must have key email",
+        )
 
 
 def _get_token_from_request(request: Request) -> str:
@@ -100,10 +115,11 @@ def _get_token_from_request(request: Request) -> str:
 
 
 def create_token(
-    user: Optional[UserSchema | None] = None,
+    user: Optional[CreateJwt | None] = None,
     expires_delta: timedelta | None = None,
     user_id: Optional[str | None] = None,
     user_role: Optional[UserRole | None] = None,
+    user_email: Optional[str | None] = None,
     is_superuser: Optional[bool] = False,
 ) -> str:
     if expires_delta:
@@ -113,15 +129,17 @@ def create_token(
     data = {}
     data["exp"] = expire
 
-    if isinstance(user, UserSchema):
+    if isinstance(user, CreateJwt):
         data["is_superuser"] = user.is_superuser
         data["id"] = user.id
         data["role"] = user.role.value
+        data["email"] = user.email
 
     elif user_id and user_role:
         data["is_superuser"] = is_superuser
         data["id"] = user_id
         data["role"] = user_role.value
+        data["email"] = user_email
     else:
         raise ValueError("Unexpected value, use Userschema or explicit values")
     return jwt.encode(data, settings.SECRET_KEY, algorithm=settings.ALGORITHMS)
@@ -144,10 +162,16 @@ async def check_authenticate(
     credentials: Credentials,
 ):
     user = await check_credentials(db, credentials)
+    email = await get_personal_model(db, user.id)
+    payload = CreateJwt(
+        id=str(user.id),
+        role=user.role,
+        is_superuser=user.is_superuser,
+        email=email["email"],
+    )
+    access_token = create_token(payload, expires_delta=access_token_expires)
 
-    access_token = create_token(user, expires_delta=access_token_expires)
-
-    refresh_token = create_token(user, expires_delta=refresh_token_expires)
+    refresh_token = create_token(payload, expires_delta=refresh_token_expires)
     return {
         "access": access_token,
         "refresh": refresh_token,

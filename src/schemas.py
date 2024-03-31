@@ -8,36 +8,6 @@ from pydantic import BaseModel, Field, field_validator
 from src.utils import UserRole
 
 
-class Register(BaseModel):
-    username: str
-    password: str
-    role: UserRole = UserRole.user
-
-    phone: Annotated[str, Field(validate_default=True)]
-    email: Annotated[str, Field(validate_default=True)]
-
-    @field_validator("email")
-    @classmethod
-    def valid_email(cls, email: str) -> str:
-        try:
-            emailinfo = validate_email(email, check_deliverability=False)
-            return emailinfo.normalized
-        except EmailNotValidError as e:
-            raise ValueError(
-                f"Unexpected value {e!r}, expected format is 'mail@.x'"
-            ) from e
-
-    @field_validator("phone")
-    @classmethod
-    def valid_phone(cls, phone: str) -> str:
-        pattern = r"^(\+)[1-9][0-9\-\(\)\.]{9,15}$"
-        if re.match(pattern, phone):
-            return phone
-        raise ValueError(
-            f"Unexpected value {phone!r}, expected format is +79005001010"
-        )
-
-
 class UserView(BaseModel):
     id: int
     username: str
@@ -67,9 +37,58 @@ class UserSchema(BaseModel):
     is_superuser: bool
 
 
+class CreateJwt(BaseModel):
+    id: str
+    role: UserRole
+    email: str
+    is_superuser: bool
+
+
 class RefreshTokenSchema(BaseModel):
     token: str
 
 
 class ChangePassword(Credentials):
     new_password: str
+
+
+class UpdateProfile(BaseModel):
+    phone: Annotated[str | None, Field(validate_default=True)]
+    email: Annotated[str | None, Field(validate_default=True)]
+
+    @field_validator("email")
+    @classmethod
+    def valid_email(cls, email: str | None) -> str | None:
+        if email is None:
+            return email
+        try:
+            emailinfo = validate_email(email, check_deliverability=False)
+            return emailinfo.normalized
+        except EmailNotValidError as e:
+            raise ValueError(
+                f"Unexpected value {e!r}, expected format is 'mail@.x'"
+            ) from e
+
+    @field_validator("phone")
+    @classmethod
+    def valid_phone(cls, phone: str | None) -> str | None:
+        if phone is None:
+            return phone
+        pattern = r"^(\+)[1-9][0-9\-\(\)\.]{9,15}$"
+        if re.match(pattern, phone):
+            return phone
+        raise ValueError(
+            f"Unexpected value {phone!r}, expected format is +79005001010"
+        )
+
+
+class Register(UpdateProfile):
+    username: str
+    password: str
+    role: UserRole = UserRole.user
+
+
+class MailSchema(BaseModel):
+    recipients: list[str]
+    body: str
+    subject: str
