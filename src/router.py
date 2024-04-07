@@ -25,6 +25,7 @@ from src.crud import (
     update_profile_model,
     update_user_model,
 )
+from src.enums import UserRole
 from src.mail import send_mail_background
 from src.schemas import (
     ChangePassword,
@@ -36,7 +37,10 @@ from src.schemas import (
     UserView,
 )
 from src.storage import get_async_session
-from src.utils import UserRole, get_password_hash
+from src.utils import (
+    get_password_hash,
+    remove_private_data,
+)
 
 router = APIRouter(prefix="/user")
 
@@ -114,15 +118,9 @@ async def profile_user(
     user_id_from_token = user_data.user_id()
     personal_model = await get_personal_model(db, user_id)
     user_model = await get_user_model(db, user_id)
-    schema = {**user_model, **personal_model}
-    if "password" in schema:
-        del schema["password"]
+    schema = {**user_model.__dict__, **personal_model}
     if user_id != user_id_from_token:
-        del schema["phone"]
-        del schema["email"]
-        del schema["role"]
-        del schema["is_active"]
-        del schema["is_superuser"]
+        remove_private_data(schema, to_another_user=True)
     return schema
 
 
@@ -138,7 +136,6 @@ async def change_profile(
     user_id = user_data.user_id()
     profile_model = await update_profile_model(db, profile, user_id)
     user_model = await get_user_model(db, user_id)
-    schema = {**profile_model, **user_model}
-    if "password" in schema:
-        del schema["password"]
+    schema = {**profile_model, **user_model.__dict__}
+    remove_private_data(schema)
     return schema

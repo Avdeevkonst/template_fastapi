@@ -1,5 +1,6 @@
 from collections.abc import AsyncGenerator
 
+from motor.motor_asyncio import AsyncIOMotorClient
 from redis import asyncio as aioredis
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
@@ -33,3 +34,12 @@ redis_client = aioredis.from_url(
     db=0,
     decode_responses=True,
 )
+
+
+client_mongo = AsyncIOMotorClient(
+    settings.db_url_mongo,
+    serverSelectionTimeoutMS=5000,
+    uuidRepresentation="pythonLegacy",
+)
+mongo_client = client_mongo.database
+collection = mongo_client.messages

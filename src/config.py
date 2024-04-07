@@ -20,6 +20,9 @@ class Settings(BaseSettings):
     REDIS_HOST: str
     REDIS_PORT: str
 
+    MONGO_HOST: str
+    MONGO_PORT: str
+
     MAIL_USERNAME: str
     MAIL_PASSWORD: str
     MAIL_FROM: str
@@ -31,14 +34,16 @@ class Settings(BaseSettings):
 
     @property
     def db_url_postgresql(self) -> str:
+        prefix = "postgresql+asyncpg://"
         return (
-            f"postgresql+asyncpg://{self.PG_USER}:{self.PG_PASS}"
+            f"{prefix}{self.PG_USER}:{self.PG_PASS}"
             f"@{self.PG_HOST}:{self.PG_PORT}/{self.PG_NAME}"
         )
 
     @property
     def db_url_redis(self) -> str:
-        return f"redis://@{self.REDIS_HOST}:{self.REDIS_PORT}/"
+        prefix = "redis://"
+        return f"{prefix}{self.REDIS_HOST}:{self.REDIS_PORT}/"
 
     @property
     def config_for_fastapi_mail(self) -> ConnectionConfig:  # pragma: no cover
@@ -52,6 +57,11 @@ class Settings(BaseSettings):
             MAIL_STARTTLS=True,
             MAIL_SSL_TLS=False,
         )
+
+    @property
+    def db_url_mongo(self) -> str:
+        prefix = "mongodb://"
+        return f"{prefix}{self.MONGO_HOST}:{self.MONGO_PORT}"
 
 
 settings = Settings()  # pyright:ignore[reportCallIssue]

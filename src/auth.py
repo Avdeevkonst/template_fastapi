@@ -1,15 +1,18 @@
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Optional, Union
+from typing import Annotated, Optional, Union
 
 import jwt
-from fastapi import HTTPException, Request, status
+from fastapi import Depends, HTTPException, Request, WebSocket, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import settings
 from src.crud import get_personal_model, get_user_model
-from src.schemas import CreateJwt, Credentials, UserSchema
-from src.utils import UserRole, verify_password
+from src.enums import UserRole
+from src.models import User
+from src.schemas import CreateJwt, Credentials
+from src.storage import get_async_session
+from src.utils import verify_password
 
 access_token_expires = timedelta(minutes=30)
 
@@ -94,7 +97,7 @@ class Token:
         )
 
 
-def _get_token_from_request(request: Request) -> str:
+def _get_token_from_request(request: Request | WebSocket) -> str:
     if not request.headers.get("Authorization", None):
         raise HTTPException(
             detail="Request must have a Authorization token",
@@ -112,6 +115,17 @@ def _get_token_from_request(request: Request) -> str:
         detail="Invalid basic header. Credentials string should not contain spaces.",
         status_code=status.HTTP_401_UNAUTHORIZED,
     )
+
+
+async def get_user_from_request(
+    request: Request | WebSocket,
+    db: Annotated[AsyncSession, Depends(get_async_session)],
+) -> User:
+    token = _get_token_from_request(request)
+    token = Token(token, [UserRole.user, UserRole.administrator])
+    token.check_permission(exclude=False)
+    user_id = token.user_id()
+    return await get_user_model(db, user_id)
 
 
 def create_token(
@@ -132,7 +146,7 @@ def create_token(
     if isinstance(user, CreateJwt):
         data["is_superuser"] = user.is_superuser
         data["id"] = user.id
-        data["role"] = user.role.value
+        data["role"] = user.role
         data["email"] = user.email
 
     elif user_id and user_role:
@@ -147,10 +161,10 @@ def create_token(
 
 async def check_credentials(
     db: AsyncSession, credentials: Credentials
-) -> UserSchema:
+) -> User:
     user = await get_user_model(db, credentials.username)
-    if verify_password(credentials.password, user["password"]):
-        return UserSchema(**user)
+    if verify_password(credentials.password, user.password):
+        return user
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Wrong password",
@@ -163,9 +177,10 @@ async def check_authenticate(
 ):
     user = await check_credentials(db, credentials)
     email = await get_personal_model(db, user.id)
+
     payload = CreateJwt(
         id=str(user.id),
-        role=user.role,
+        role=str(user.role),
         is_superuser=user.is_superuser,
         email=email["email"],
     )

@@ -3,9 +3,15 @@ import re
 from typing import Annotated
 
 from email_validator import EmailNotValidError, validate_email
-from pydantic import BaseModel, Field, field_validator
+from fastapi import HTTPException, status
+from pydantic import (
+    BaseModel,
+    Field,
+    field_validator,
+    model_validator,
+)
 
-from src.utils import UserRole
+from src.enums import UserRole
 
 
 class UserView(BaseModel):
@@ -39,7 +45,7 @@ class UserSchema(BaseModel):
 
 class CreateJwt(BaseModel):
     id: str
-    role: UserRole
+    role: str
     email: str
     is_superuser: bool
 
@@ -92,3 +98,48 @@ class MailSchema(BaseModel):
     recipients: list[str]
     body: str
     subject: str
+
+
+class BaseMessage(BaseModel):
+    text: str | None
+    photo: str | None
+    sender_id: int
+    receiver_id: int
+
+    @model_validator(mode="after")
+    def check_passwords_match(self):
+        text = self.text
+        photo = self.photo
+        if text is not None and photo is not None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="required any of photo or text",
+            )
+        return self
+
+
+class IdField(BaseModel):
+    id: int
+
+
+class DeleteMessage(IdField):
+    pass
+
+
+class UpdateMessage(DeleteMessage):
+    text: str
+
+
+class CreateMessage(BaseMessage):
+    pass
+
+
+class WSMessageRequest(BaseModel):
+    message: UpdateMessage | CreateMessage | DeleteMessage
+
+    class Config:
+        orm_mode = True
+
+
+class ResponseMessage(IdField, BaseMessage):
+    created_at: datetime.datetime
