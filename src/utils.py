@@ -1,9 +1,11 @@
 import re
 import secrets
-from enum import Enum
 from typing import NoReturn
 
-from fastapi import HTTPException, status
+from fastapi import (
+    HTTPException,
+    status,
+)
 from passlib.context import CryptContext
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -31,13 +33,24 @@ def handle_error(error: SQLAlchemyError) -> NoReturn:
 
 
 def convert_sqlachemy_exception(error: SQLAlchemyError):
-    detail = repr(error).partition("DETAIL")[-1]
+    if "DETAIL" in repr(error):
+        detail = repr(error).partition("DETAIL")[-1]
+    else:
+        detail = repr(error)
     pattern = r"[^a-zA-Zа-яА-Я@\s+=.]"
     cleaned_string = re.sub(pattern, "", detail)
     return cleaned_string.strip()
 
 
-class UserRole(Enum):
-    user = "user"
-    administrator = "admin"
-    noone = ""
+def remove_private_data(
+    payload: dict, *, to_another_user: bool = False
+) -> None:
+    if to_another_user:
+        del payload["phone"]
+        del payload["email"]
+        del payload["role"]
+        del payload["is_active"]
+        del payload["is_superuser"]
+        del payload["password"]
+    else:
+        del payload["password"]
