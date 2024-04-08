@@ -138,7 +138,7 @@ class WSMessageRequest(BaseModel):
     message: UpdateMessage | CreateMessage | DeleteMessage
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 
 class ResponseMessage(IdField, BaseMessage):

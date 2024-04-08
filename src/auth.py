@@ -3,7 +3,8 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated, Optional, Union
 
 import jwt
-from fastapi import Depends, HTTPException, Request, WebSocket, status
+from fastapi import Depends, HTTPException, status
+from fastapi.requests import HTTPConnection
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import settings
@@ -97,7 +98,7 @@ class Token:
         )
 
 
-def _get_token_from_request(request: Request | WebSocket) -> str:
+def _get_token_from_request(request: HTTPConnection) -> str:
     if not request.headers.get("Authorization", None):
         raise HTTPException(
             detail="Request must have a Authorization token",
@@ -118,7 +119,7 @@ def _get_token_from_request(request: Request | WebSocket) -> str:
 
 
 async def get_user_from_request(
-    request: Request | WebSocket,
+    request: HTTPConnection,
     db: Annotated[AsyncSession, Depends(get_async_session)],
 ) -> User:
     token = _get_token_from_request(request)
