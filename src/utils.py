@@ -35,6 +35,8 @@ def handle_error(error: SQLAlchemyError) -> NoReturn:
 def convert_sqlachemy_exception(error: SQLAlchemyError):
     if "DETAIL" in repr(error):
         detail = repr(error).partition("DETAIL")[-1]
+    elif "NoResultFound" in repr(error):
+        detail = repr(error).partition("NoResultFound")[-1]
     else:
         detail = repr(error)
     pattern = r"[^a-zA-Zа-яА-Я@\s+=.]"

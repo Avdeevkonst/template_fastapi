@@ -1,5 +1,3 @@
-from collections.abc import AsyncGenerator
-
 from motor.motor_asyncio import AsyncIOMotorClient
 from redis import asyncio as aioredis
 from sqlalchemy.ext.asyncio import (
@@ -22,11 +20,6 @@ async_session_maker = async_sessionmaker(
     class_=AsyncSession,
     expire_on_commit=False,
 )
-
-
-async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
-    async with async_session_maker() as session:  # pragma: no cover
-        yield session
 
 
 redis_client = aioredis.from_url(

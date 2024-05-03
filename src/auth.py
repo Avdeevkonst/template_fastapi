@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Annotated, Optional, Union
+from typing import Annotated, Any, AsyncGenerator, Optional, Union
 
 import jwt
 from fastapi import Depends, HTTPException, status
@@ -9,10 +9,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import settings
 from src.crud import get_personal_model, get_user_model
+from src.dependencies import get_async_session
 from src.enums import UserRole
 from src.models import User
 from src.schemas import CreateJwt, Credentials
-from src.storage import get_async_session
 from src.utils import verify_password
 
 access_token_expires = timedelta(minutes=30)
@@ -118,17 +118,6 @@ def _get_token_from_request(request: HTTPConnection) -> str:
     )
 
 
-async def get_user_from_request(
-    request: HTTPConnection,
-    db: Annotated[AsyncSession, Depends(get_async_session)],
-) -> User:
-    token = _get_token_from_request(request)
-    token = Token(token, [UserRole.user, UserRole.administrator])
-    token.check_permission(exclude=False)
-    user_id = token.user_id()
-    return await get_user_model(db, user_id)
-
-
 def create_token(
     user: Optional[CreateJwt | None] = None,
     expires_delta: timedelta | None = None,
@@ -181,7 +170,7 @@ async def check_authenticate(
 
     payload = CreateJwt(
         id=str(user.id),
-        role=str(user.role),
+        role=str(user.role.value),  # pyright: ignore[reportAttributeAccessIssue]
         is_superuser=user.is_superuser,
         email=email["email"],
     )
@@ -227,3 +216,12 @@ class RefreshToken(Token):
             }
         else:
             raise ValueError("Unexpected decryption result")
+
+
+async def get_user_from_request(
+    request: HTTPConnection,
+    db: Annotated[AsyncSession, Depends(get_async_session)],
+) -> AsyncGenerator[User, Any]:
+    token = _get_token_from_request(request)
+    user_id = Token(token, [UserRole.user, UserRole.administrator]).user_id()
+    yield await get_user_model(db, user_id)

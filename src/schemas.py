@@ -17,7 +17,8 @@ from src.enums import UserRole
 class UserView(BaseModel):
     id: int
     username: str
-    created_at: datetime.datetime
+    creation_date: datetime.datetime
+    modified_date: datetime.datetime | None
     is_active: bool
     is_superuser: bool
     phone: str
@@ -143,3 +144,7 @@ class WSMessageRequest(BaseModel):
 
 class ResponseMessage(IdField, BaseMessage):
     created_at: datetime.datetime
+
+
+class AddContact(IdField):
+    to_add: int

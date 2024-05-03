@@ -16,18 +16,26 @@ from src.auth import (
     _get_token_from_request,
     check_authenticate,
     check_credentials,
+    get_user_from_request,
 )
 from src.crud import (
+    create_contact,
     create_personal_model,
     create_user_model,
+    delete_chat,
+    get_chats_by_user,
+    get_messages_model,
     get_personal_model,
     get_user_model,
     update_profile_model,
     update_user_model,
 )
+from src.dependencies import get_async_session
 from src.enums import UserRole
 from src.mail import send_mail_background
+from src.models import User
 from src.schemas import (
+    AddContact,
     ChangePassword,
     Credentials,
     MailSchema,
@@ -36,7 +44,6 @@ from src.schemas import (
     UpdateProfile,
     UserView,
 )
-from src.storage import get_async_session
 from src.utils import (
     get_password_hash,
     remove_private_data,
@@ -53,6 +60,8 @@ async def registration_user(
     personal = await create_personal_model(db, body, user["id"])
     await db.commit()
     schema = {**user, **personal}
+    if "modified_date" not in schema:
+        schema["modified_date"] = None
     if "password" in schema:
         del schema["password"]
     return UserView(**schema)
@@ -139,3 +148,63 @@ async def change_profile(
     schema = {**profile_model, **user_model.__dict__}
     remove_private_data(schema)
     return schema
+
+
+@router.post("/add-contact", status_code=status.HTTP_201_CREATED)
+async def add_contact(
+    request: Request,
+    db: Annotated[AsyncSession, Depends(get_async_session)],
+    payload: AddContact,
+):
+    token = _get_token_from_request(request)
+    user_data = Token(token, [UserRole.user, UserRole.administrator])
+    user_data.check_permission(exclude=False)
+    user_id = user_data.user_id()
+    if user_id != payload.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Permission Error"
+        )
+    chat = await create_contact(db, payload)
+    await db.commit()
+    return chat
+
+
+@router.get("/contacts", status_code=status.HTTP_200_OK)
+async def list_contacts(
+    request: Request,
+    db: Annotated[AsyncSession, Depends(get_async_session)],
+):
+    token = _get_token_from_request(request)
+    user_data = Token(token, [UserRole.user, UserRole.administrator])
+    user_data.check_permission(exclude=False)
+    owner = user_data.user_id()
+    return await get_chats_by_user(db, owner)
+
+
+@router.delete("/contact/{chat_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_contact(
+    request: Request,
+    db: Annotated[AsyncSession, Depends(get_async_session)],
+    chat_id: int,
+):
+    token = _get_token_from_request(request)
+    user_data = Token(token, [UserRole.user, UserRole.administrator])
+    user_data.check_permission(exclude=False)
+    await delete_chat(db, chat_id)
+
+
+@router.get("/chat/{chat_id}", status_code=status.HTTP_200_OK)
+async def get_chat(
+    request: Request,
+    db: Annotated[AsyncSession, Depends(get_async_session)],
+    chat_id: int,
+):
+    token = _get_token_from_request(request)
+    user_data = Token(token, [UserRole.user, UserRole.administrator])
+    user_data.check_permission(exclude=False)
+    return await get_messages_model(db, chat_id)
+
+
+@router.get("/me")
+async def me(user: Annotated[User, Depends(get_user_from_request)]):
+    return user
