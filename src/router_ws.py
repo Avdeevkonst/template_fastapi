@@ -11,6 +11,7 @@ from src.crud import (
     delete_message_model,
     update_message_model,
 )
+from src.dependencies import get_async_session
 from src.managers import manager
 from src.models import User
 from src.schemas import (
@@ -19,7 +20,6 @@ from src.schemas import (
     UpdateMessage,
     WSMessageRequest,
 )
-from src.storage import get_async_session
 
 router = APIRouter()
 

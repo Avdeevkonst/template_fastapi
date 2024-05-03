@@ -9,8 +9,9 @@ from sqlalchemy.exc import (
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.exception import SchemaError
-from src.models import Message, Personal, User
+from src.models import Chat, Message, Personal, User
 from src.schemas import (
+    AddContact,
     ChangePassword,
     CreateMessage,
     Credentials,
@@ -30,7 +31,7 @@ async def create_user_model(db: AsyncSession, body: Register):
     password = get_password_hash(body.password)
     stmt = User(
         username=body.username,
-        password=password,
+        password=str(password),
         role=body.role,
     )
     db.add(stmt)
@@ -174,12 +175,13 @@ async def create_message_model(
 
 
 async def get_messages_model(
-    db: AsyncSession, sender_id: int, receiver_id: int
+    db: AsyncSession,
+    chat_id: int,
 ) -> Sequence[Message]:
     query = (
         select(Message)
-        .where(Message.sender == sender_id, Message.receiver == receiver_id)
-        .order_by(Message.created_at.desc())
+        .where(Message.chat_id == chat_id)
+        .order_by(Message.creation_date.desc())
     )
     try:
         found = await db.execute(query)
@@ -225,3 +227,78 @@ async def update_message_model(db: AsyncSession, new_message: UpdateMessage):
         await db.rollback()
         handle_error(e)
     return message
+
+
+async def create_contact(db: AsyncSession, payload: AddContact):
+    stmt = Chat(user=payload.id, contact=payload.to_add)
+    db.add(stmt)
+    try:
+        await db.flush()
+    except (SQLAlchemyError, IntegrityError) as e:
+        await db.rollback()
+        handle_error(e)
+    return stmt
+
+
+async def get_chat_by_id(db: AsyncSession, id_key: int) -> Chat:
+    query = select(Chat).where(Chat.id == id_key)
+    try:
+        response = await db.execute(query)
+        contact = response.scalar_one()
+    except (
+        NoResultFound,
+        SQLAlchemyError,
+        IntegrityError,
+    ) as e:
+        await db.rollback()
+        handle_error(e)
+    return contact
+
+
+async def get_chat_by_user(
+    db: AsyncSession, user_id: int, contact_id: int
+) -> Chat:
+    query = select(Chat).where(
+        Chat.user == user_id, Chat.contact == contact_id
+    )
+    try:
+        response = await db.execute(query)
+        contact = response.scalar_one()
+    except (
+        NoResultFound,
+        SQLAlchemyError,
+        IntegrityError,
+    ) as e:
+        await db.rollback()
+        handle_error(e)
+    return contact
+
+
+async def get_chats_by_user(db: AsyncSession, user_id: int) -> Sequence[Chat]:
+    query = select(Chat).where(Chat.user == user_id)
+    try:
+        response = await db.execute(query)
+        await db.commit()
+        contacts = response.scalars().fetchall()
+    except (
+        NoResultFound,
+        SQLAlchemyError,
+        IntegrityError,
+    ) as e:
+        await db.rollback()
+        handle_error(e)
+    return contacts
+
+
+async def delete_chat(db: AsyncSession, chat_id: int) -> None:
+    query = delete(Chat).where(Chat.id == chat_id)
+    try:
+        await db.execute(query)
+        await db.commit()
+    except (
+        NoResultFound,
+        SQLAlchemyError,
+        IntegrityError,
+    ) as e:
+        await db.rollback()
+        handle_error(e)

@@ -1,9 +1,24 @@
+from typing import Any
+
 from fastapi import WebSocket
 
 from src.schemas import CreateMessage, UpdateMessage
 
 
-class WsConnectionManager:
+class Singleton:  # pragma: no cover
+    def __new__(cls, *args: Any, **kwds: Any):
+        it = cls.__dict__.get("__it__")
+        if it is not None:
+            return it
+        cls.__it__ = it = object.__new__(cls)
+        it.init(*args, **kwds)
+        return it
+
+    def init(self, *args: Any, **kwds: Any):
+        pass
+
+
+class WsConnectionManager(Singleton):
     def __init__(self):
         self.active_connections: dict[str, tuple[WebSocket]] = {}
 
