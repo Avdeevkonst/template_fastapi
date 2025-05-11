@@ -1,67 +1,59 @@
-from sqlalchemy import CheckConstraint, Enum, ForeignKey, Integer, String, Text
-from sqlalchemy.orm import Mapped, mapped_column
+import uuid
+from datetime import datetime
+from typing import Final
 
-from src.enums import UserRole
-from src.managers import manager
-from src.mixins import TimestampMixin
-from src.storage import Base
+from sqlalchemy import DateTime, String
+from sqlalchemy.ext.asyncio import AsyncAttrs
+from sqlalchemy.orm import DeclarativeBase, Mapped, declared_attr, mapped_column
 
-
-class User(Base, TimestampMixin):
-    __tablename__ = "user"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-
-    username: Mapped[str] = mapped_column(
-        String(20), index=True, unique=True, nullable=False
-    )
-    password: Mapped[str] = mapped_column(String(1024), nullable=False)
-
-    role: Mapped[Enum] = mapped_column(Enum(UserRole), nullable=False)
-
-    is_active: Mapped[bool] = mapped_column(default=True)
-
-    is_superuser: Mapped[bool] = mapped_column(default=False)
-
-    def is_connected_ws(self):
-        return bool(manager.active_connections.get(str(self.id), False))
+DESCRIPTION_LENGTH: Final = 400
+NAME_LENGTH: Final = 100
+STRING_LENGTH: Final = 255
 
 
-class Personal(Base, TimestampMixin):
-    __tablename__ = "personal"
+class Base(AsyncAttrs, DeclarativeBase):
+    """
+    Base class for all models.
+    """
 
-    id: Mapped[int] = mapped_column(ForeignKey("user.id"), primary_key=True)
-
-    phone: Mapped[str] = mapped_column(String(12), nullable=False, unique=True)
-
-    email: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    ...
 
 
-class Message(Base, TimestampMixin):
-    __tablename__ = "message"
+class TimestampMixin:
+    """
+    Mixin for timestamp fields.
+    """
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.now)
 
-    text: Mapped[str] = mapped_column(Text, nullable=False)
-
-    photo: Mapped[str] = mapped_column(String, nullable=True)
-
-    sender: Mapped[int] = mapped_column(ForeignKey("user.id"), nullable=False)
-
-    chat_id: Mapped[int] = mapped_column(ForeignKey("chat.id"), index=True)
-
-    receiver: Mapped[int] = mapped_column(
-        ForeignKey("user.id"), nullable=False
-    )
-
-    __table_args__ = (CheckConstraint("NOT(photo IS NULL AND text IS NULL)"),)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
-class Chat(Base, TimestampMixin):
-    __tablename__ = "chat"
+class PrimaryKeyUUID:
+    """
+    Mixin for primary key UUID field.
+    """
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
 
-    user: Mapped[int] = mapped_column(ForeignKey("user.id"), index=True)
 
-    contact: Mapped[int] = mapped_column(ForeignKey("user.id"), index=True)
+class CommonData:
+    """
+    Mixin for name and description fields.
+    """
+
+    name: Mapped[str] = mapped_column(String(length=NAME_LENGTH), nullable=False, unique=True)
+    description: Mapped[str] = mapped_column(String(length=DESCRIPTION_LENGTH), nullable=True)
+
+
+class General(Base, PrimaryKeyUUID, TimestampMixin):
+    """
+    Abstract base class for all models.
+    """
+
+    __abstract__ = True
+
+    @declared_attr  # pyright: ignore[reportArgumentType]
+    @classmethod
+    def __tablename__(cls):
+        return cls.__name__.lower()
